@@ -23,7 +23,7 @@ const envSchema = z.object({
   TRACKER_ENABLED: z
     .enum(['true', 'false'])
     .default('true')
-    .transform((val) => val === 'true'),
+    .transform((val) => val === 'true')
 })
 
 export type Env = z.infer<typeof envSchema>

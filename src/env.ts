@@ -14,6 +14,7 @@ const envSchema = z.object({
   // Redis - support both URL-based connection and individual parameters
   REDIS_URL: z.string().optional(),
   REDIS_PRIVATE_URL: z.string().optional(),
+  REDIS_PUBLIC_URL: z.string().optional(), // Add this
   REDIS_HOST: z.string().optional(),
   REDIS_PORT: z.coerce.number().optional(),
   REDIS_DATABASE_INDEX: z.coerce.number().default(0),
@@ -28,10 +29,7 @@ const envSchema = z.object({
   TRACKER_ENABLED: z
     .enum(['true', 'false'])
     .default('true')
-    .transform((val) => val === 'true'),
-
-  // PAY URL
-  PAY_URL: z.string().default('https://razorpay.me/@10xdev')
+    .transform((val) => val === 'true')
 })
 
 export type Env = z.infer<typeof envSchema>

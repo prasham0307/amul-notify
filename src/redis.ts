@@ -4,12 +4,21 @@ import env from '@/env'
 // Priority: Individual Railway variables FIRST, then URL-based
 let redisUrl: string | undefined
 
+// Debug: Log what we have
+console.log('🔍 Debug Redis vars:', {
+  REDISHOST: env.REDISHOST,
+  REDISPORT: env.REDISPORT,
+  REDIS_URL: env.REDIS_URL ? 'exists' : 'missing',
+  REDIS_PUBLIC_URL: env.REDIS_PUBLIC_URL ? 'exists' : 'missing'
+})
+
 // Try Railway individual variables first (these work better)
 if (env.REDISHOST && env.REDISPORT) {
   const user = env.REDISUSER || 'default'
   const password = env.REDISPASSWORD || ''
   redisUrl = `redis://${user}:${password}@${env.REDISHOST}:${env.REDISPORT}`
   console.log('📡 Constructed Redis URL from Railway individual variables')
+  console.log('🔍 Using host:', env.REDISHOST)
 } else {
   // Fallback to URL-based connection
   redisUrl = env.REDIS_PRIVATE_URL || env.REDIS_URL

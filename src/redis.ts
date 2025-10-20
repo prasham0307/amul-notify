@@ -2,7 +2,7 @@ import { Redis } from 'ioredis'
 import env from '@/env'
 
 // Use REDIS_PUBLIC_URL which uses external network (more reliable than internal DNS)
-let redisUrl = env.REDIS_PUBLIC_URL || env.REDIS_PRIVATE_URL || env.REDIS_URL
+const redisUrl = env.REDIS_PUBLIC_URL || env.REDIS_PRIVATE_URL || env.REDIS_URL
 
 if (redisUrl) {
   console.log('📡 Using Redis public URL')

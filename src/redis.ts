@@ -1,30 +1,13 @@
 import { Redis } from 'ioredis'
 import env from '@/env'
 
-// Priority: Individual Railway variables FIRST, then URL-based
-let redisUrl: string | undefined
+// Use REDIS_PUBLIC_URL which uses external network (more reliable than internal DNS)
+let redisUrl = env.REDIS_PUBLIC_URL || env.REDIS_PRIVATE_URL || env.REDIS_URL
 
-// Debug: Log what we have
-console.log('🔍 Debug Redis vars:', {
-  REDISHOST: env.REDISHOST,
-  REDISPORT: env.REDISPORT,
-  REDIS_URL: env.REDIS_URL ? 'exists' : 'missing',
-  REDIS_PUBLIC_URL: env.REDIS_PUBLIC_URL ? 'exists' : 'missing'
-})
-
-// Try Railway individual variables first (these work better)
-if (env.REDISHOST && env.REDISPORT) {
-  const user = env.REDISUSER || 'default'
-  const password = env.REDISPASSWORD || ''
-  redisUrl = `redis://${user}:${password}@${env.REDISHOST}:${env.REDISPORT}`
-  console.log('📡 Constructed Redis URL from Railway individual variables')
-  console.log('🔍 Using host:', env.REDISHOST)
+if (redisUrl) {
+  console.log('📡 Using Redis public URL')
 } else {
-  // Fallback to URL-based connection
-  redisUrl = env.REDIS_PRIVATE_URL || env.REDIS_URL
-  if (redisUrl) {
-    console.log('📡 Using Redis URL from environment')
-  }
+  console.log('⚠️ No Redis URL found, using localhost')
 }
 
 const redis = redisUrl
@@ -48,8 +31,8 @@ const redis = redisUrl
       enableOfflineQueue: false
     })
   : new Redis({
-      host: env.REDIS_HOST || env.REDISHOST || 'localhost',
-      port: env.REDIS_PORT || env.REDISPORT || 6379,
+      host: env.REDIS_HOST || 'localhost',
+      port: env.REDIS_PORT || 6379,
       password: env.REDISPASSWORD,
       db: env.REDIS_DATABASE_INDEX,
       maxRetriesPerRequest: 3,

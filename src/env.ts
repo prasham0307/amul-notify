@@ -23,7 +23,8 @@ const envSchema = z.object({
     .default('true')
     .transform((val) => val === 'true'),
 
-  
+  // PAY URL
+  PAY_URL: z.string().default('https://razorpay.me/@10xdev')
 })
 
 export type Env = z.infer<typeof envSchema>

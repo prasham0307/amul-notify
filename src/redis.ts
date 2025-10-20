@@ -15,7 +15,9 @@ const redis = redisUrl
           return null
         }
         const delay = Math.min(times * 1000, 3000)
-        console.log(`Retrying Redis connection in ${delay}ms (attempt ${times})`)
+        console.log(
+          `Retrying Redis connection in ${delay}ms (attempt ${times})`
+        )
         return delay
       },
       lazyConnect: true,
@@ -63,7 +65,9 @@ redis.on('close', () => {
 })
 
 // Log connection info
-console.log(`📡 Redis configuration: ${redisUrl ? 'Using REDIS_URL' : `${env.REDIS_HOST}:${env.REDIS_PORT}`}`)
+console.log(
+  `📡 Redis configuration: ${redisUrl ? 'Using REDIS_URL' : `${env.REDIS_HOST}:${env.REDIS_PORT}`}`
+)
 
 // Connect with proper error handling
 const connectRedis = async () => {

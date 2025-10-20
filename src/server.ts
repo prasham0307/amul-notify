@@ -24,7 +24,7 @@ const waitForRedis = async () => {
         console.log('✅ Redis connection ready')
         resolve()
       })
-      
+
       // Timeout after 10 seconds and continue anyway
       setTimeout(() => {
         console.warn('⚠️ Redis connection timeout - continuing without Redis')
@@ -90,7 +90,7 @@ const startServer = async () => {
       stockCheckerJob.start()
       stockCheckerJob.execute()
       console.log('✅ Stock checker job started')
-      
+
       console.log('Starting activity notifier job...')
       activityNotifierJob.start()
       console.log('✅ Activity notifier job started')

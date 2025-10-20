@@ -1,4 +1,3 @@
-import env from '@/env'
 import { CommandContext } from '@/types/context.types'
 import { emojis } from '@/utils/emoji.util'
 import { MiddlewareFn } from 'telegraf'

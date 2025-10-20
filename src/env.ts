@@ -1,6 +1,5 @@
 import chalk from 'chalk'
 import { existsSync, writeFileSync } from 'fs'
-// import path from 'path'
 import { z } from 'zod'
 
 const envSchema = z.object({
@@ -12,7 +11,8 @@ const envSchema = z.object({
   BOT_TOKEN: z.string().min(1, { message: 'BOT_TOKEN is required' }),
   BOT_WEBHOOK_URL: z.string().optional(),
 
-  // Redis
+  // Redis - support both URL-based connection and individual parameters
+  REDIS_URL: z.string().optional(),
   REDIS_HOST: z.string().default('localhost'),
   REDIS_PORT: z.coerce.number().default(6379),
   REDIS_DATABASE_INDEX: z.coerce.number().default(0),

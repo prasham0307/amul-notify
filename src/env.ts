@@ -17,7 +17,7 @@ const envSchema = z.object({
   REDIS_HOST: z.string().optional(),
   REDIS_PORT: z.coerce.number().optional(),
   REDIS_DATABASE_INDEX: z.coerce.number().default(0),
-  
+
   // Railway Redis variables
   REDISHOST: z.string().optional(),
   REDISPORT: z.coerce.number().optional(),

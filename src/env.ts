@@ -14,9 +14,15 @@ const envSchema = z.object({
   // Redis - support both URL-based connection and individual parameters
   REDIS_URL: z.string().optional(),
   REDIS_PRIVATE_URL: z.string().optional(),
-  REDIS_HOST: z.string().default('localhost'),
-  REDIS_PORT: z.coerce.number().default(6379),
+  REDIS_HOST: z.string().optional(),
+  REDIS_PORT: z.coerce.number().optional(),
   REDIS_DATABASE_INDEX: z.coerce.number().default(0),
+  
+  // Railway Redis variables
+  REDISHOST: z.string().optional(),
+  REDISPORT: z.coerce.number().optional(),
+  REDISUSER: z.string().optional(),
+  REDISPASSWORD: z.string().optional(),
 
   // Tracker
   TRACKER_ENABLED: z

@@ -1,14 +1,22 @@
 import { Redis } from 'ioredis'
 import env from '@/env'
 
-// Priority: REDIS_PRIVATE_URL > REDIS_URL > individual params
-const redisUrl = env.REDIS_PRIVATE_URL || env.REDIS_URL
+// Build Redis URL from Railway variables if available
+let redisUrl = env.REDIS_PRIVATE_URL || env.REDIS_URL
+
+// If Railway provides individual variables, construct the URL
+if (!redisUrl && env.REDISHOST && env.REDISPORT) {
+  const user = env.REDISUSER || 'default'
+  const password = env.REDISPASSWORD || ''
+  redisUrl = `redis://${user}:${password}@${env.REDISHOST}:${env.REDISPORT}`
+  console.log('📡 Constructed Redis URL from Railway variables')
+}
 
 const redis = redisUrl
   ? new Redis(redisUrl, {
       maxRetriesPerRequest: 3,
-      connectTimeout: 10000, // 10 seconds
-      family: 4, // Force IPv4
+      connectTimeout: 10000,
+      family: 4,
       retryStrategy: (times) => {
         if (times > 3) {
           console.error('Redis connection failed after 3 retries')
@@ -25,8 +33,9 @@ const redis = redisUrl
       enableOfflineQueue: false
     })
   : new Redis({
-      host: env.REDIS_HOST,
-      port: env.REDIS_PORT,
+      host: env.REDIS_HOST || env.REDISHOST || 'localhost',
+      port: env.REDIS_PORT || env.REDISPORT || 6379,
+      password: env.REDISPASSWORD,
       db: env.REDIS_DATABASE_INDEX,
       maxRetriesPerRequest: 3,
       connectTimeout: 10000,
@@ -64,12 +73,10 @@ redis.on('close', () => {
   console.log('⚠️ Redis connection closed')
 })
 
-// Log connection info
 console.log(
-  `📡 Redis configuration: ${redisUrl ? 'Using REDIS_URL' : `${env.REDIS_HOST}:${env.REDIS_PORT}`}`
+  `📡 Redis configuration: ${redisUrl ? 'Using Redis URL' : 'Individual params'}`
 )
 
-// Connect with proper error handling
 const connectRedis = async () => {
   try {
     console.log('🔄 Attempting to connect to Redis...')
@@ -80,7 +87,6 @@ const connectRedis = async () => {
   }
 }
 
-// Connect to Redis
 connectRedis()
 
 export default redis

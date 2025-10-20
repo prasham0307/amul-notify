@@ -9,7 +9,7 @@ COPY package*.json bun.lock* ./
 RUN bun install --frozen-lockfile
 
 # Copy .env.prod file if it exists
-COPY .env.prod .env.prod
+COPY .env.prod* ./
 
 # Copy source files
 COPY . .

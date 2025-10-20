@@ -1,3 +1,9 @@
+// DNS Configuration - MUST be at the very top before any imports
+import dns from 'dns'
+dns.setServers(['8.8.8.8', '1.1.1.1'])
+console.log('Using DNS servers:', dns.getServers())
+
+// Now all other imports
 import mongoose from 'mongoose'
 import env from '@/env'
 import bot from '@/bot'
@@ -7,20 +13,40 @@ import { initiateAmulSessions } from './services/amul.service'
 import app from '@/app'
 import { activityNotifierJob } from './jobs/activityReport.job'
 
-redis.on('connect', () => {
-  console.log('Connected to Redis successfully')
-})
-redis.on('error', (err) => {
-  console.error('Failed to connect to Redis:', err)
-})
+// Wait for Redis to be ready before starting the app
+const waitForRedis = async () => {
+  return new Promise<void>((resolve) => {
+    if (redis.status === 'ready') {
+      console.log('✅ Redis already connected')
+      resolve()
+    } else {
+      redis.once('ready', () => {
+        console.log('✅ Redis connection ready')
+        resolve()
+      })
+      
+      // Timeout after 10 seconds and continue anyway
+      setTimeout(() => {
+        console.warn('⚠️ Redis connection timeout - continuing without Redis')
+        resolve()
+      }, 10000)
+    }
+  })
+}
 
-mongoose
-  .connect(env.MONGO_URI)
-  .then(async () => {
-    console.log('Connected to MongoDB successfully')
+const startServer = async () => {
+  try {
+    // Wait for Redis
+    await waitForRedis()
 
-    initiateAmulSessions()
+    // Connect to MongoDB
+    await mongoose.connect(env.MONGO_URI)
+    console.log('✅ Connected to MongoDB successfully')
 
+    // Initialize Amul sessions
+    await initiateAmulSessions()
+
+    // Setup bot
     if (env.BOT_WEBHOOK_URL) {
       const botSecret = `amul_${bot.secretPathComponent()}`
       console.log(`Setting webhook to: ${env.BOT_WEBHOOK_URL}`)
@@ -34,7 +60,6 @@ mongoose
         : url.pathname
 
       app.use(hookPath, (req, res) => {
-        // console.log('Bot Secret:', req.get('X-Telegram-Bot-Api-Secret-Token'))
         if (req.get('X-Telegram-Bot-Api-Secret-Token') !== botSecret) {
           console.error('Invalid secret token')
           return res.status(403).end()
@@ -42,41 +67,56 @@ mongoose
 
         bot.handleUpdate(req.body, res).catch((err) => {
           console.error('Error in bot.handleUpdate:', err)
-          // Still respond 200 so Telegram won’t retry endlessly
           res.status(200).end()
         })
       })
 
-      console.log('Bot is running with webhook mode...')
-      console.log(await bot.telegram.getWebhookInfo())
+      console.log('✅ Bot is running with webhook mode...')
+      const webhookInfo = await bot.telegram.getWebhookInfo()
+      console.log('Webhook info:', webhookInfo)
     } else {
-      bot
-        .launch(() => {
-          console.log('Bot is running...')
-        })
-        .catch((err) => {
-          console.error('Failed to launch bot:', err)
-        })
+      await bot.launch()
+      console.log('✅ Bot is running in polling mode...')
     }
 
+    // Start Express server
     app.listen(env.PORT, () => {
-      console.log(`Server is running on port ${env.PORT}`)
+      console.log(`✅ Server is running on port ${env.PORT}`)
     })
 
-    // Start job
+    // Start jobs
     if (env.TRACKER_ENABLED) {
       console.log('Starting stock checker job...')
       stockCheckerJob.start()
       stockCheckerJob.execute()
-      console.log('Stock checker job started')
+      console.log('✅ Stock checker job started')
+      
       console.log('Starting activity notifier job...')
       activityNotifierJob.start()
-      console.log('Activity notifier job started')
+      console.log('✅ Activity notifier job started')
     } else {
-      console.log('Stock tracker is disabled. Skipping job execution.')
+      console.log('⚠️ Stock tracker is disabled. Skipping job execution.')
     }
-  })
-  .catch((err) => {
-    console.error('Failed to connect to MongoDB:', err)
-    process.exit(1) // Exit the process if MongoDB connection fails
-  })
+  } catch (err) {
+    console.error('❌ Failed to start server:', err)
+    process.exit(1)
+  }
+}
+
+// Handle graceful shutdown
+process.on('SIGINT', async () => {
+  console.log('⚠️ Shutting down gracefully...')
+  await redis.quit()
+  await mongoose.disconnect()
+  process.exit(0)
+})
+
+process.on('SIGTERM', async () => {
+  console.log('⚠️ Shutting down gracefully...')
+  await redis.quit()
+  await mongoose.disconnect()
+  process.exit(0)
+})
+
+// Start the server
+startServer()

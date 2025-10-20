@@ -1,48 +1,82 @@
 import { Redis } from 'ioredis'
 import env from '@/env'
 
-// Use REDIS_URL if provided (for Railway/production), otherwise use individual parameters (for local)
-const redis = env.REDIS_URL
-  ? new Redis(env.REDIS_URL, {
+// Priority: REDIS_PRIVATE_URL > REDIS_URL > individual params
+const redisUrl = env.REDIS_PRIVATE_URL || env.REDIS_URL
+
+const redis = redisUrl
+  ? new Redis(redisUrl, {
       maxRetriesPerRequest: 3,
+      connectTimeout: 10000, // 10 seconds
+      family: 4, // Force IPv4
       retryStrategy: (times) => {
         if (times > 3) {
           console.error('Redis connection failed after 3 retries')
-          return null // Stop retrying
+          return null
         }
-        const delay = Math.min(times * 200, 2000)
+        const delay = Math.min(times * 1000, 3000)
+        console.log(`Retrying Redis connection in ${delay}ms (attempt ${times})`)
         return delay
-      }
+      },
+      lazyConnect: true,
+      enableReadyCheck: false,
+      enableOfflineQueue: false
     })
   : new Redis({
       host: env.REDIS_HOST,
       port: env.REDIS_PORT,
       db: env.REDIS_DATABASE_INDEX,
       maxRetriesPerRequest: 3,
+      connectTimeout: 10000,
+      family: 4,
       retryStrategy: (times) => {
         if (times > 3) {
           console.error('Redis connection failed after 3 retries')
-          return null // Stop retrying
+          return null
         }
-        const delay = Math.min(times * 200, 2000)
+        const delay = Math.min(times * 1000, 3000)
         return delay
-      }
+      },
+      lazyConnect: true,
+      enableReadyCheck: false,
+      enableOfflineQueue: false
     })
 
 redis.on('error', (err) => {
-  console.error('Failed to connect to Redis:', err)
+  console.error('Redis error:', err.message || err)
 })
 
 redis.on('connect', () => {
-  console.log('Connected to Redis successfully')
+  console.log('✅ Connected to Redis successfully')
 })
 
 redis.on('ready', () => {
-  console.log('Redis is ready to accept commands')
+  console.log('✅ Redis is ready to accept commands')
 })
 
 redis.on('reconnecting', () => {
-  console.log('Redis is reconnecting...')
+  console.log('⚠️ Redis is reconnecting...')
 })
+
+redis.on('close', () => {
+  console.log('⚠️ Redis connection closed')
+})
+
+// Log connection info
+console.log(`📡 Redis configuration: ${redisUrl ? 'Using REDIS_URL' : `${env.REDIS_HOST}:${env.REDIS_PORT}`}`)
+
+// Connect with proper error handling
+const connectRedis = async () => {
+  try {
+    console.log('🔄 Attempting to connect to Redis...')
+    await redis.connect()
+    console.log('✅ Redis connection established')
+  } catch (err) {
+    console.error('❌ Failed to establish Redis connection:', err)
+  }
+}
+
+// Connect to Redis
+connectRedis()
 
 export default redis

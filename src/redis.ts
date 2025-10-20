@@ -1,15 +1,21 @@
 import { Redis } from 'ioredis'
 import env from '@/env'
 
-// Build Redis URL from Railway variables if available
-let redisUrl = env.REDIS_PRIVATE_URL || env.REDIS_URL
+// Priority: Individual Railway variables FIRST, then URL-based
+let redisUrl: string | undefined
 
-// If Railway provides individual variables, construct the URL
-if (!redisUrl && env.REDISHOST && env.REDISPORT) {
+// Try Railway individual variables first (these work better)
+if (env.REDISHOST && env.REDISPORT) {
   const user = env.REDISUSER || 'default'
   const password = env.REDISPASSWORD || ''
   redisUrl = `redis://${user}:${password}@${env.REDISHOST}:${env.REDISPORT}`
-  console.log('📡 Constructed Redis URL from Railway variables')
+  console.log('📡 Constructed Redis URL from Railway individual variables')
+} else {
+  // Fallback to URL-based connection
+  redisUrl = env.REDIS_PRIVATE_URL || env.REDIS_URL
+  if (redisUrl) {
+    console.log('📡 Using Redis URL from environment')
+  }
 }
 
 const redis = redisUrl
@@ -72,10 +78,6 @@ redis.on('reconnecting', () => {
 redis.on('close', () => {
   console.log('⚠️ Redis connection closed')
 })
-
-console.log(
-  `📡 Redis configuration: ${redisUrl ? 'Using Redis URL' : 'Individual params'}`
-)
 
 const connectRedis = async () => {
   try {

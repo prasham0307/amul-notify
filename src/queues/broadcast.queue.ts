@@ -11,27 +11,42 @@ import ProductModel from '@/models/product.model'
 setServers(['8.8.8.8', '1.1.1.1'] as const)
 console.log(`Using DNS servers: ${getServers()}`)
 
+// Use REDIS_PUBLIC_URL if available, otherwise fall back to individual config
+const redisUrl = env.REDIS_PUBLIC_URL || env.REDIS_PRIVATE_URL || env.REDIS_URL
+
 const broadcastQueue = new Bull<{
   chatId: string | number
   text: string
   extra?: ExtraReplyMessage
-}>('broadcast', {
-  // 30 messages per second
-  defaultJobOptions: {
-    attempts: 1, // Retry once if it fails
-    removeOnComplete: true, // Remove job from queue after completion
-    removeOnFail: true // Remove job from queue after failure
-  },
-  limiter: {
-    max: 30,
-    duration: 2000 // keeping it at 30 messages per 2 seconds
-  },
-  redis: {
-    host: env.REDIS_HOST,
-    port: env.REDIS_PORT,
-    db: env.REDIS_DATABASE_INDEX
+}>(
+  'broadcast',
+  redisUrl ||
+    `redis://${env.REDIS_HOST}:${env.REDIS_PORT}/${env.REDIS_DATABASE_INDEX}`,
+  {
+    // 30 messages per second
+    defaultJobOptions: {
+      attempts: 1, // Retry once if it fails
+      removeOnComplete: true, // Remove job from queue after completion
+      removeOnFail: true // Remove job from queue after failure
+    },
+    limiter: {
+      max: 30,
+      duration: 2000 // keeping it at 30 messages per 2 seconds
+    },
+    redis: {
+      // CRITICAL: Set maxRetriesPerRequest to null for unlimited retries
+      maxRetriesPerRequest: null,
+      enableReadyCheck: true,
+      enableOfflineQueue: true,
+      connectTimeout: 15000,
+      retryStrategy: (times: number) => {
+        const delay = Math.min(times * 500, 3000)
+        console.log(`🔄 Bull queue retrying Redis connection in ${delay}ms`)
+        return delay
+      }
+    }
   }
-})
+)
 
 broadcastQueue.process(5, async (job) => {
   const { chatId, text, extra } = job.data

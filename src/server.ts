@@ -13,71 +13,122 @@ import { initiateAmulSessions } from './services/amul.service'
 import app from '@/app'
 import { activityNotifierJob } from './jobs/activityReport.job'
 
-// Wait for Redis to be ready before starting the app
+// Wait for Redis with a shorter timeout
 const waitForRedis = async () => {
   return new Promise<void>((resolve) => {
     // Check if already connected
     if (redis.status === 'ready' || redis.status === 'connect') {
-      console.log('✅ Redis already connected')
+      console.log('✅ Redis connection ready')
       resolve()
       return
     }
 
     let resolved = false
 
-    redis.once('ready', () => {
+    const onReady = () => {
       if (!resolved) {
         resolved = true
-        console.log('✅ Redis connection ready')
+        console.log('✅ Redis connection established')
         resolve()
       }
-    })
+    }
 
-    redis.once('connect', () => {
+    const onConnect = () => {
       if (!resolved) {
         resolved = true
         console.log('✅ Redis connected')
         resolve()
       }
-    })
+    }
 
-    // Timeout after 10 seconds and continue anyway
+    const onError = (err: Error) => {
+      console.error('❌ Redis connection error:', err.message)
+      if (!resolved) {
+        resolved = true
+        console.warn('⚠️ Continuing without Redis due to connection error')
+        resolve()
+      }
+    }
+
+    redis.once('ready', onReady)
+    redis.once('connect', onConnect)
+    redis.once('error', onError)
+
+    // Timeout after 5 seconds instead of 10
     setTimeout(() => {
       if (!resolved) {
         resolved = true
+        redis.off('ready', onReady)
+        redis.off('connect', onConnect)
+        redis.off('error', onError)
+
         // Check one more time before warning
         if (redis.status === 'ready' || redis.status === 'connect') {
           console.log('✅ Redis connected (detected on timeout check)')
         } else {
-          console.warn('⚠️ Redis connection timeout - continuing without Redis')
+          console.warn(
+            '⚠️ Redis connection timeout (5s) - continuing without Redis'
+          )
+          console.warn('⚠️ App will use in-memory cache or direct API calls')
         }
         resolve()
       }
-    }, 10000)
+    }, 5000)
   })
+}
+
+// Database maintenance function
+const performDatabaseMaintenance = async () => {
+  try {
+    console.log('🔧 Performing database maintenance...')
+
+    const usersCollection = mongoose.connection.db?.collection('users')
+
+    if (usersCollection) {
+      try {
+        await usersCollection.dropIndex('userId_1')
+        console.log('✅ Dropped old userId index')
+      } catch (err: any) {
+        if (err.code === 27 || err.codeName === 'IndexNotFound') {
+          console.log('ℹ️ userId index does not exist (already cleaned)')
+        } else {
+          console.log('⚠️ Index cleanup warning:', err.message)
+        }
+      }
+
+      // Verify current indexes
+      try {
+        const indexes = await usersCollection.indexes()
+        console.log(
+          '📋 Current user indexes:',
+          indexes.map((idx) => idx.name).join(', ')
+        )
+      } catch (err) {
+        console.log('⚠️ Could not list indexes:', err)
+      }
+    }
+
+    console.log('✅ Database maintenance completed')
+  } catch (err) {
+    console.error('❌ Database maintenance error:', err)
+    // Don't throw - maintenance errors shouldn't prevent startup
+  }
 }
 
 const startServer = async () => {
   try {
-    // Wait for Redis
+    // Wait for Redis (with timeout)
     await waitForRedis()
+
+    // Log Redis status
+    console.log(`📊 Redis status: ${redis.status}`)
 
     // Connect to MongoDB
     await mongoose.connect(env.MONGO_URI)
     console.log('✅ Connected to MongoDB successfully')
 
-    // Clean up old MongoDB indexes
-    try {
-      await mongoose.connection.db?.collection('users').dropIndex('userId_1')
-      console.log('✅ Dropped old userId index')
-    } catch (err: any) {
-      if (err.code === 27 || err.codeName === 'IndexNotFound') {
-        // Index doesn't exist - that's fine
-        console.log('ℹ️ userId index does not exist (already cleaned)')
-      } else {
-        console.log('⚠️ Index cleanup warning:', err.message)
-      }
-    }
+    // Perform database maintenance
+    await performDatabaseMaintenance()
 
     // Initialize Amul sessions
     await initiateAmulSessions()
@@ -140,18 +191,55 @@ const startServer = async () => {
 }
 
 // Handle graceful shutdown
-process.on('SIGINT', async () => {
-  console.log('⚠️ Shutting down gracefully...')
-  await redis.quit()
-  await mongoose.disconnect()
-  process.exit(0)
+const gracefulShutdown = async (signal: string) => {
+  console.log(`⚠️ ${signal} received - Shutting down gracefully...`)
+
+  try {
+    // Stop jobs first
+    if (env.TRACKER_ENABLED) {
+      console.log('Stopping jobs...')
+      stockCheckerJob.stop()
+      activityNotifierJob.stop()
+      console.log('✅ Jobs stopped')
+    }
+
+    // Close bot
+    console.log('Stopping bot...')
+    await bot.stop(signal)
+    console.log('✅ Bot stopped')
+
+    // Close Redis connection
+    if (redis.status !== 'end') {
+      console.log('Closing Redis connection...')
+      await redis.quit()
+      console.log('✅ Redis closed')
+    }
+
+    // Close MongoDB connection
+    console.log('Closing MongoDB connection...')
+    await mongoose.disconnect()
+    console.log('✅ MongoDB closed')
+
+    console.log('✅ Graceful shutdown completed')
+    process.exit(0)
+  } catch (err) {
+    console.error('❌ Error during shutdown:', err)
+    process.exit(1)
+  }
+}
+
+process.on('SIGINT', () => gracefulShutdown('SIGINT'))
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'))
+
+// Handle uncaught exceptions
+process.on('uncaughtException', (err) => {
+  console.error('❌ Uncaught Exception:', err)
+  gracefulShutdown('uncaughtException')
 })
 
-process.on('SIGTERM', async () => {
-  console.log('⚠️ Shutting down gracefully...')
-  await redis.quit()
-  await mongoose.disconnect()
-  process.exit(0)
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason)
+  gracefulShutdown('unhandledRejection')
 })
 
 // Start the server

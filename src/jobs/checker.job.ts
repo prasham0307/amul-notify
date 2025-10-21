@@ -37,6 +37,7 @@ const stockCheckerJob = schedule(
       const distinctSubstores = await getDistinctSubstores()
 
       for (const substore of distinctSubstores) {
+        const substoreStartTime = Date.now()
         try {
           let amulApi = await getAmulApiFromSubstore(substore)
 
@@ -81,9 +82,15 @@ const stockCheckerJob = schedule(
             )
           }
 
+          // First, check cache
+          const cachedProducts = await cacheService.jobData.get({ substore })
+
+          // Then fetch fresh products
+          const fetchStartTime = Date.now()
           const freshProducts = await amulApi.getProteinProducts({
             bypassCache: true
           })
+          const fetchDuration = Date.now() - fetchStartTime
 
           if (!freshProducts || !freshProducts.length) {
             console.warn(
@@ -95,21 +102,24 @@ const stockCheckerJob = schedule(
             continue
           }
 
-          console.log(`Fetched fresh products:`, freshProducts.length)
-          const cachedProducts = await cacheService.jobData.get({
-            substore
-          })
-          console.log(`Fetched cached products:`, cachedProducts?.length)
+          console.log(
+            `✅ Fetched fresh products: ${freshProducts.length} (${fetchDuration}ms)`
+          )
+
+          // If no cached products, initialize cache and continue
           if (!cachedProducts?.length) {
-            console.log(`Setting fresh products:`, freshProducts.length)
+            console.log(
+              `📦 Initializing cache with ${freshProducts.length} products`
+            )
             const resp = await cacheService.jobData.set(
               { substore },
               freshProducts
             )
-            console.log(`Cache set response:`, resp)
+            console.log(`✅ Cache initialized: ${resp}`)
             continue
           }
-          console.log(`cachedProducts`, cachedProducts.length)
+
+          console.log(`📋 Cached products: ${cachedProducts.length}`)
 
           // map through fresh products and check if any have changed
           const promises: Promise<any>[] = []
@@ -174,13 +184,21 @@ const stockCheckerJob = schedule(
             )
           })
 
-          await cacheService.jobData.set({ substore }, freshProducts) // Update cache with fresh products
+          // Update cache with fresh products
+          await cacheService.jobData.set({ substore }, freshProducts)
 
           if (!changedProducts.length) {
-            console.log('No stock changes detected.')
-
+            const totalDuration = Date.now() - substoreStartTime
+            console.log(
+              `✅ No stock changes detected for ${substore} (${totalDuration}ms)`
+            )
             continue
           }
+
+          console.log(
+            `🔄 Detected ${changedProducts.length} product changes:`,
+            changedProducts.map((p) => `${p.name} (${p.sku})`).join(', ')
+          )
 
           await Promise.allSettled(promises) // Wait for all findAndUpdateProductsWithAlwaysTracking promises to resolve
 
@@ -352,6 +370,11 @@ const stockCheckerJob = schedule(
                 .join(', ')}\nNotified ${notifiedCount} users.`
             )
           }
+
+          const totalDuration = Date.now() - substoreStartTime
+          console.log(
+            `✅ Completed ${substore} stock check (${totalDuration}ms)`
+          )
 
           await sleep(500) // Sleep for 500ms to avoid rate limiting
         } catch (err: any) {

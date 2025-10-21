@@ -15,58 +15,50 @@ if (redisUrl) {
   console.log('⚠️ No Redis URL found, using localhost')
 }
 
+// Common Redis options
+const commonOptions = {
+  maxRetriesPerRequest: null, // CRITICAL: null means no limit per request
+  connectTimeout: 15000, // Increased from 10s
+  commandTimeout: 10000, // Increased from 5s
+  family: 4, // IPv4
+  retryStrategy: (times: number) => {
+    // Never give up on connection retries (only affects connection, not commands)
+    const delay = Math.min(times * 500, 3000) // Exponential backoff up to 3s
+    console.log(`🔄 Retrying Redis connection in ${delay}ms (attempt ${times})`)
+    return delay
+  },
+  lazyConnect: false,
+  enableReadyCheck: true,
+  enableOfflineQueue: true, // Keep commands queued during reconnection
+  keepAlive: 30000,
+  reconnectOnError: (err: Error) => {
+    const targetErrors = ['READONLY', 'ECONNRESET', 'ETIMEDOUT', 'ECONNREFUSED']
+    const shouldReconnect = targetErrors.some((target) => err.message.includes(target))
+    if (shouldReconnect) {
+      console.log(`🔄 Reconnecting due to: ${err.message}`)
+    }
+    return shouldReconnect
+  },
+  // Additional stability options
+  showFriendlyErrorStack: true,
+  autoResubscribe: true,
+  autoResendUnfulfilledCommands: true,
+}
+
 const redis = redisUrl
-  ? new Redis(redisUrl, {
-      maxRetriesPerRequest: null, // null = unlimited retries (recommended for production)
-      connectTimeout: 10000, // Increased to 10s for stability
-      commandTimeout: 5000,
-      family: 4,
-      retryStrategy: (times) => {
-        if (times > 10) {
-          console.error('❌ Redis connection failed after 10 retries')
-          return null // Stop retrying after 10 attempts
-        }
-        const delay = Math.min(times * 1000, 5000) // Exponential backoff up to 5s
-        console.log(
-          `🔄 Retrying Redis connection in ${delay}ms (attempt ${times}/10)`
-        )
-        return delay
-      },
-      lazyConnect: false,
-      enableReadyCheck: true,
-      enableOfflineQueue: true,
-      keepAlive: 30000, // Keep connection alive
-      reconnectOnError: (err) => {
-        const targetErrors = ['READONLY', 'ECONNRESET', 'ETIMEDOUT']
-        return targetErrors.some((target) => err.message.includes(target))
-      }
-    })
+  ? new Redis(redisUrl, commonOptions)
   : new Redis({
       host: env.REDIS_HOST || 'localhost',
       port: env.REDIS_PORT || 6379,
       password: env.REDISPASSWORD,
       db: env.REDIS_DATABASE_INDEX,
-      maxRetriesPerRequest: null,
-      connectTimeout: 10000,
-      commandTimeout: 5000,
-      family: 4,
-      retryStrategy: (times) => {
-        if (times > 10) {
-          console.error('❌ Redis connection failed after 10 retries')
-          return null
-        }
-        const delay = Math.min(times * 1000, 5000)
-        return delay
-      },
-      lazyConnect: false,
-      enableReadyCheck: true,
-      enableOfflineQueue: true,
-      keepAlive: 30000
+      ...commonOptions,
     })
 
+// Enhanced error handling
 redis.on('error', (err) => {
   console.error('❌ Redis error:', err.message || err)
-  // Don't crash on Redis errors - let retry logic handle it
+  // Don't crash - let retry logic handle it
 })
 
 redis.on('connect', () => {
@@ -77,8 +69,8 @@ redis.on('ready', () => {
   console.log('✅ Redis is ready to accept commands')
 })
 
-redis.on('reconnecting', () => {
-  console.log('🔄 Redis is reconnecting...')
+redis.on('reconnecting', (timeUntilReconnect: number) => {
+  console.log(`🔄 Redis reconnecting in ${timeUntilReconnect}ms...`)
 })
 
 redis.on('close', () => {
@@ -89,25 +81,34 @@ redis.on('end', () => {
   console.log('⚠️ Redis connection ended')
 })
 
-// Add a health check method
+// Health check with more states
 export const isRedisHealthy = (): boolean => {
-  return redis.status === 'ready' || redis.status === 'connect'
+  const healthyStates = ['ready', 'connect', 'connecting']
+  return healthyStates.includes(redis.status)
 }
 
-// Export a safe get wrapper with timeout
-export const safeRedisGet = async (key: string): Promise<string | null> => {
+// Safe wrapper with proper timeout handling
+export const safeRedisGet = async (
+  key: string,
+  timeoutMs: number = 5000
+): Promise<string | null> => {
   try {
     if (!isRedisHealthy()) {
       console.warn('⚠️ Redis not healthy, skipping GET')
       return null
     }
 
-    // Add timeout to prevent hanging
     const timeoutPromise = new Promise<null>((resolve) => {
-      setTimeout(() => resolve(null), 3000) // 3s timeout
+      setTimeout(() => {
+        console.warn(`⚠️ Redis GET timed out after ${timeoutMs}ms for key: ${key}`)
+        resolve(null)
+      }, timeoutMs)
     })
 
-    const result = await Promise.race([redis.get(key), timeoutPromise])
+    const result = await Promise.race([
+      redis.get(key),
+      timeoutPromise
+    ])
 
     return result
   } catch (err) {
@@ -116,11 +117,11 @@ export const safeRedisGet = async (key: string): Promise<string | null> => {
   }
 }
 
-// Export a safe set wrapper with timeout
 export const safeRedisSet = async (
   key: string,
   value: string,
-  expirySeconds?: number
+  expirySeconds?: number,
+  timeoutMs: number = 5000
 ): Promise<boolean> => {
   try {
     if (!isRedisHealthy()) {
@@ -128,9 +129,11 @@ export const safeRedisSet = async (
       return false
     }
 
-    // Add timeout to prevent hanging
     const timeoutPromise = new Promise<boolean>((resolve) => {
-      setTimeout(() => resolve(false), 3000) // 3s timeout
+      setTimeout(() => {
+        console.warn(`⚠️ Redis SET timed out after ${timeoutMs}ms for key: ${key}`)
+        resolve(false)
+      }, timeoutMs)
     })
 
     const setPromise = async () => {
@@ -143,7 +146,6 @@ export const safeRedisSet = async (
     }
 
     const result = await Promise.race([setPromise(), timeoutPromise])
-
     return result
   } catch (err) {
     console.error('❌ Redis SET error:', err)
@@ -151,32 +153,65 @@ export const safeRedisSet = async (
   }
 }
 
-// Export a safe delete wrapper
-export const safeRedisDel = async (key: string): Promise<boolean> => {
+export const safeRedisDel = async (
+  key: string,
+  timeoutMs: number = 5000
+): Promise<boolean> => {
   try {
     if (!isRedisHealthy()) {
       console.warn('⚠️ Redis not healthy, skipping DEL')
       return false
     }
-    await redis.del(key)
-    return true
+
+    const timeoutPromise = new Promise<boolean>((resolve) => {
+      setTimeout(() => resolve(false), timeoutMs)
+    })
+
+    const result = await Promise.race([
+      redis.del(key).then(() => true),
+      timeoutPromise
+    ])
+
+    return result
   } catch (err) {
     console.error('❌ Redis DEL error:', err)
     return false
   }
 }
 
-// Export a safe exists wrapper
-export const safeRedisExists = async (key: string): Promise<boolean> => {
+export const safeRedisExists = async (
+  key: string,
+  timeoutMs: number = 5000
+): Promise<boolean> => {
   try {
     if (!isRedisHealthy()) {
       return false
     }
-    const result = await redis.exists(key)
-    return result === 1
+
+    const timeoutPromise = new Promise<boolean>((resolve) => {
+      setTimeout(() => resolve(false), timeoutMs)
+    })
+
+    const result = await Promise.race([
+      redis.exists(key).then(count => count === 1),
+      timeoutPromise
+    ])
+
+    return result
   } catch (err) {
     console.error('❌ Redis EXISTS error:', err)
     return false
+  }
+}
+
+// Graceful shutdown helper
+export const closeRedis = async (): Promise<void> => {
+  try {
+    await redis.quit()
+    console.log('✅ Redis connection closed gracefully')
+  } catch (err) {
+    console.error('❌ Error closing Redis:', err)
+    redis.disconnect()
   }
 }
 

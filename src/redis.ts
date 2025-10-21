@@ -33,7 +33,9 @@ const commonOptions = {
   keepAlive: 30000,
   reconnectOnError: (err: Error) => {
     const targetErrors = ['READONLY', 'ECONNRESET', 'ETIMEDOUT', 'ECONNREFUSED']
-    const shouldReconnect = targetErrors.some((target) => err.message.includes(target))
+    const shouldReconnect = targetErrors.some((target) =>
+      err.message.includes(target)
+    )
     if (shouldReconnect) {
       console.log(`🔄 Reconnecting due to: ${err.message}`)
     }
@@ -42,7 +44,7 @@ const commonOptions = {
   // Additional stability options
   showFriendlyErrorStack: true,
   autoResubscribe: true,
-  autoResendUnfulfilledCommands: true,
+  autoResendUnfulfilledCommands: true
 }
 
 const redis = redisUrl
@@ -52,7 +54,7 @@ const redis = redisUrl
       port: env.REDIS_PORT || 6379,
       password: env.REDISPASSWORD,
       db: env.REDIS_DATABASE_INDEX,
-      ...commonOptions,
+      ...commonOptions
     })
 
 // Enhanced error handling
@@ -100,15 +102,14 @@ export const safeRedisGet = async (
 
     const timeoutPromise = new Promise<null>((resolve) => {
       setTimeout(() => {
-        console.warn(`⚠️ Redis GET timed out after ${timeoutMs}ms for key: ${key}`)
+        console.warn(
+          `⚠️ Redis GET timed out after ${timeoutMs}ms for key: ${key}`
+        )
         resolve(null)
       }, timeoutMs)
     })
 
-    const result = await Promise.race([
-      redis.get(key),
-      timeoutPromise
-    ])
+    const result = await Promise.race([redis.get(key), timeoutPromise])
 
     return result
   } catch (err) {
@@ -131,7 +132,9 @@ export const safeRedisSet = async (
 
     const timeoutPromise = new Promise<boolean>((resolve) => {
       setTimeout(() => {
-        console.warn(`⚠️ Redis SET timed out after ${timeoutMs}ms for key: ${key}`)
+        console.warn(
+          `⚠️ Redis SET timed out after ${timeoutMs}ms for key: ${key}`
+        )
         resolve(false)
       }, timeoutMs)
     })
@@ -193,7 +196,7 @@ export const safeRedisExists = async (
     })
 
     const result = await Promise.race([
-      redis.exists(key).then(count => count === 1),
+      redis.exists(key).then((count) => count === 1),
       timeoutPromise
     ])
 

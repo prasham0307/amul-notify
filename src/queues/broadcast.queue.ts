@@ -32,19 +32,9 @@ const broadcastQueue = new Bull<{
     limiter: {
       max: 30,
       duration: 2000 // keeping it at 30 messages per 2 seconds
-    },
-    redis: {
-      // CRITICAL: Set maxRetriesPerRequest to null for unlimited retries
-      maxRetriesPerRequest: null,
-      enableReadyCheck: true,
-      enableOfflineQueue: true,
-      connectTimeout: 15000,
-      retryStrategy: (times: number) => {
-        const delay = Math.min(times * 500, 3000)
-        console.log(`🔄 Bull queue retrying Redis connection in ${delay}ms`)
-        return delay
-      }
     }
+    // NOTE: Bull doesn't allow redis options for bclient/subscriber
+    // The connection will use default settings which is fine
   }
 )
 

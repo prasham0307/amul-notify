@@ -16,21 +16,44 @@ import { activityNotifierJob } from './jobs/activityReport.job'
 // Wait for Redis to be ready before starting the app
 const waitForRedis = async () => {
   return new Promise<void>((resolve) => {
-    if (redis.status === 'ready') {
+    // Check if already connected
+    if (redis.status === 'ready' || redis.status === 'connect') {
       console.log('✅ Redis already connected')
       resolve()
-    } else {
-      redis.once('ready', () => {
+      return
+    }
+
+    let resolved = false
+
+    redis.once('ready', () => {
+      if (!resolved) {
+        resolved = true
         console.log('✅ Redis connection ready')
         resolve()
-      })
+      }
+    })
 
-      // Timeout after 10 seconds and continue anyway
-      setTimeout(() => {
-        console.warn('⚠️ Redis connection timeout - continuing without Redis')
+    redis.once('connect', () => {
+      if (!resolved) {
+        resolved = true
+        console.log('✅ Redis connected')
         resolve()
-      }, 10000)
-    }
+      }
+    })
+
+    // Timeout after 10 seconds and continue anyway
+    setTimeout(() => {
+      if (!resolved) {
+        resolved = true
+        // Check one more time before warning
+        if (redis.status === 'ready' || redis.status === 'connect') {
+          console.log('✅ Redis connected (detected on timeout check)')
+        } else {
+          console.warn('⚠️ Redis connection timeout - continuing without Redis')
+        }
+        resolve()
+      }
+    }, 10000)
   })
 }
 
@@ -42,6 +65,19 @@ const startServer = async () => {
     // Connect to MongoDB
     await mongoose.connect(env.MONGO_URI)
     console.log('✅ Connected to MongoDB successfully')
+
+    // Clean up old MongoDB indexes
+    try {
+      await mongoose.connection.db?.collection('users').dropIndex('userId_1')
+      console.log('✅ Dropped old userId index')
+    } catch (err: any) {
+      if (err.code === 27 || err.codeName === 'IndexNotFound') {
+        // Index doesn't exist - that's fine
+        console.log('ℹ️ userId index does not exist (already cleaned)')
+      } else {
+        console.log('⚠️ Index cleanup warning:', err.message)
+      }
+    }
 
     // Initialize Amul sessions
     await initiateAmulSessions()

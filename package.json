@@ -6,13 +6,13 @@
   "scripts": {
     "env:dev": "dotenv -e .env.dev --",
     "env:prod": "dotenv -e .env.prod --",
-    "build": "bun run lint && tsc && tsc-alias",
-    "start": "bun run dist/server.js",
-    "dev": "bun run env:dev bun run --watch src/server.ts",
+    "build": "pnpm run lint && tsc && tsc-alias",
+    "start": "node dist/server.js",
+    "dev": "dotenv -e .env.dev -- tsx watch src/server.ts",
     "lint": "eslint . --ext .ts",
     "prettier": "prettier --write .",
-    "seed:dev": "bun run env:dev bun run src/seeders/index.ts",
-    "seed:prod": "bun run env:prod bun run dist/seeders/index.js"
+    "seed:dev": "dotenv -e .env.dev -- tsx src/seeders/index.ts",
+    "seed:prod": "dotenv -e .env.prod -- node dist/seeders/index.js"
   },
   "keywords": [],
   "author": "",
@@ -34,7 +34,7 @@
   "dependencies": {
     "axios": "^1.10.0",
     "axios-cookiejar-support": "^6.0.2",
-    "bull": "^4.16.5",
+    "bullmq": "^5.66.5",
     "chalk": "4.1.2",
     "cors": "^2.8.5",
     "dayjs": "^1.11.13",

@@ -1,6 +1,11 @@
 import { BotCommand } from 'telegraf/typings/core/types/typegram'
+import env from './env' // Import your env file so we can read the variable
 
-export const LOG_CHANNEL = -4963360663
+// FIX: Use the ID from .env, or fallback to YOUR personal ID (not the old group)
+// Fallback to process.env directly if the 'env' import is being stubborn
+export const LOG_CHANNEL = process.env.LOG_CHANNEL_ID 
+  ? parseInt(process.env.LOG_CHANNEL_ID) 
+  : 1102128542
 
 export const userCommands: readonly BotCommand[] = [
   { command: 'start', description: 'Start the bot' },

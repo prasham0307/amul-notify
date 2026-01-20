@@ -11,9 +11,9 @@ const redisUrl = env.REDIS_PUBLIC_URL || env.REDIS_PRIVATE_URL || env.REDIS_URL
 // Common Redis options
 const commonOptions: RedisOptions = {
   maxRetriesPerRequest: null, // CRITICAL: null means no limit per request
-  connectTimeout: 15000,
-  commandTimeout: 10000,
-  family: 4,
+  connectTimeout: 30000,      // ✅ CHANGED: Increased to 30 seconds
+  commandTimeout: 30000,      // ✅ CHANGED: Increased to 30 seconds
+  family: 4,                  // Forces IPv4
   retryStrategy: (times: number) => Math.min(times * 500, 3000),
   lazyConnect: false,
   enableReadyCheck: true,
@@ -39,7 +39,6 @@ export const createRedisConnection = (): Redis => {
 }
 
 // --- EXPORT THE SHARED CONNECTION ---
-// This fixes the "red squiggle" because we now export 'connection' explicitly
 export const connection = createRedisConnection()
 
 // Keep default export for backward compatibility if needed
@@ -56,7 +55,7 @@ connection.on('ready', () =>
   console.log('✅ Redis is ready to accept commands')
 )
 
-// Helper functions (Optional, kept from your original code)
+// Helper functions
 export const closeRedis = async (): Promise<void> => {
   try {
     await connection.quit()

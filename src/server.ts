@@ -166,14 +166,16 @@ const startServer = async () => {
       console.log('✅ Bot is running in polling mode...')
     }
 
-    // --- ADDED HEALTH CHECK ROUTE HERE ---
+    // --- HEALTH CHECK ROUTE ---
     app.get('/', (req: any, res: any) => {
       res.status(200).send('Amul Notify Bot is Alive!')
     })
 
-    // Start Express server
-    app.listen(env.PORT, () => {
-      console.log(`✅ Server is running on port ${env.PORT}`)
+    // --- START SERVER (FIXED BINDING) ---
+    const PORT = Number(process.env.PORT) || 10000
+    // Bind to 0.0.0.0 to ensure external access
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`✅ Server is running on port ${PORT}`)
     })
 
     // Start jobs

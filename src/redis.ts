@@ -22,7 +22,7 @@ const commonOptions: RedisOptions = {
   reconnectOnError: (err: Error) => {
     const targetErrors = ['READONLY', 'ECONNRESET', 'ETIMEDOUT', 'ECONNREFUSED']
     return targetErrors.some((target) => err.message.includes(target))
-  },
+  }
 }
 
 // --- FACTORY FUNCTION ---
@@ -34,7 +34,7 @@ export const createRedisConnection = (): Redis => {
         port: env.REDIS_PORT || 6379,
         password: env.REDISPASSWORD,
         db: env.REDIS_DATABASE_INDEX,
-        ...commonOptions,
+        ...commonOptions
       })
 }
 
@@ -46,9 +46,15 @@ export const connection = createRedisConnection()
 export default connection
 
 // Event listeners
-connection.on('error', (err) => console.error('❌ Redis error:', err.message || err))
-connection.on('connect', () => console.log('✅ Connected to Redis successfully'))
-connection.on('ready', () => console.log('✅ Redis is ready to accept commands'))
+connection.on('error', (err) =>
+  console.error('❌ Redis error:', err.message || err)
+)
+connection.on('connect', () =>
+  console.log('✅ Connected to Redis successfully')
+)
+connection.on('ready', () =>
+  console.log('✅ Redis is ready to accept commands')
+)
 
 // Helper functions (Optional, kept from your original code)
 export const closeRedis = async (): Promise<void> => {

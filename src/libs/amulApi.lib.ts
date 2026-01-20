@@ -65,57 +65,60 @@ export class AmulApi {
   }
 
   public async initCookies() {
-    const cookieResponse = await this.amulApi.get(
-      'https://shop.amul.com/en/browse/protein'
-    )
+    const cookieResponse = await this.amulApi.get(
+      'https://shop.amul.com/en/browse/protein'
+    )
 
-    if (!cookieResponse.headers['set-cookie']) {
-      throw new Error('No cookies received from Amul API')
-    }
+    if (!cookieResponse.headers['set-cookie']) {
+      throw new Error('No cookies received from Amul API')
+    }
 
-    const parsedCookies = cookieResponse.headers['set-cookie'].map(
-      (cookieStr) => parseCookie(cookieStr, { loose: true })
-    )
+    const parsedCookies = cookieResponse.headers['set-cookie'].map(
+      (cookieStr) => parseCookie(cookieStr, { loose: true })
+    )
 
-    for (const cookie of parsedCookies) {
-      if (!cookie || !cookie.key) {
-        console.warn('Invalid cookie:', cookie)
-        continue
-      }
+    for (const cookie of parsedCookies) {
+      if (!cookie || !cookie.key) {
+        console.warn('Invalid cookie:', cookie)
+        continue
+      }
 
-      try {
-        // attempt to set the cookie
-        await this.jar.setCookie(cookie, 'https://shop.amul.com')
-      } catch (err: any) {
-        // Check if it's the specific domain mismatch error
-        if (err.message && err.message.includes("Cookie not in this host's domain")) {
-          // Simply ignore it. It's a cross-domain tracking cookie we don't need.
-          // console.warn(`⚠️ Ignored cross-domain cookie: ${cookie.key}`);
-        } else {
-          // If it's some other error, re-throw it so we know something is wrong
-          throw err
-        }
-      }
-    }
+      try {
+        // attempt to set the cookie
+        await this.jar.setCookie(cookie, 'https://shop.amul.com')
+      } catch (err: any) {
+        // Check if it's the specific domain mismatch error
+        if (
+          err.message &&
+          err.message.includes("Cookie not in this host's domain")
+        ) {
+          // Simply ignore it. It's a cross-domain tracking cookie we don't need.
+          // console.warn(`⚠️ Ignored cross-domain cookie: ${cookie.key}`);
+        } else {
+          // If it's some other error, re-throw it so we know something is wrong
+          throw err
+        }
+      }
+    }
 
-    const infoResponse = await this.amulApi.get<string>(
-      `https://shop.amul.com/user/info.js?_v=${Date.now()}`,
-      {
-        headers: {
-          ...defaultHeaders,
-          cookie: await this.jar.getCookieString('https://shop.amul.com'),
-          tid: await this.calculateTidHeader()
-        }
-      }
-    )
+    const infoResponse = await this.amulApi.get<string>(
+      `https://shop.amul.com/user/info.js?_v=${Date.now()}`,
+      {
+        headers: {
+          ...defaultHeaders,
+          cookie: await this.jar.getCookieString('https://shop.amul.com'),
+          tid: await this.calculateTidHeader()
+        }
+      }
+    )
 
-    const sessionObj = JSON.parse(
-      infoResponse.data.replace('session = ', '')
-    ) as AmulSessionInfo
+    const sessionObj = JSON.parse(
+      infoResponse.data.replace('session = ', '')
+    ) as AmulSessionInfo
 
-    this.tid = sessionObj.tid
-    console.log('TID:', this.tid)
-  }
+    this.tid = sessionObj.tid
+    console.log('TID:', this.tid)
+  }
 
   public async setPincode(record: PincodeRecord) {
     // await setPincodeQueue({

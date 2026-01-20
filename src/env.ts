@@ -31,7 +31,7 @@ const envSchema = z.object({
     .default('true')
     .transform((val) => val === 'true'),
   LOG_CHANNEL_ID: z.string().optional()
-});
+})
 
 export type Env = z.infer<typeof envSchema>
 

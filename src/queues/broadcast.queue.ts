@@ -2,10 +2,10 @@ import bot from '@/bot'
 import UserModel from '@/models/user.model'
 import ProductModel from '@/models/product.model'
 import { emojis } from '@/utils/emoji.util'
-import { Queue, Worker, QueueEvents } from 'bullmq' 
+import { Queue, Worker, QueueEvents } from 'bullmq'
 import { TelegramError } from 'telegraf'
 import { ExtraReplyMessage } from 'telegraf/typings/telegram-types'
-import { connection, createRedisConnection } from '@/redis' 
+import { connection, createRedisConnection } from '@/redis'
 
 // 1. Define the Queue (Producers add jobs here)
 export const broadcastQueue = new Queue('broadcast', {
@@ -13,13 +13,13 @@ export const broadcastQueue = new Queue('broadcast', {
   defaultJobOptions: {
     attempts: 1,
     removeOnComplete: true,
-    removeOnFail: true,
-  },
+    removeOnFail: true
+  }
 })
 
 // 2. Define the QueueEvents (To listen for "finished" events)
 const queueEvents = new QueueEvents('broadcast', {
-  connection: createRedisConnection(), 
+  connection: createRedisConnection()
 })
 
 // 3. Define the Worker (Consumers process jobs here)
@@ -31,7 +31,7 @@ export const broadcastWorker = new Worker(
     try {
       const defaultExtra: ExtraReplyMessage = {
         parse_mode: 'HTML',
-        disable_notification: false,
+        disable_notification: false
       }
 
       Object.assign(defaultExtra, extra)
@@ -48,7 +48,7 @@ export const broadcastWorker = new Worker(
         if (isBlocked) {
           console.warn(`User ${chatId} blocked bot. Removing from DB.`)
           const deleteResponse = await UserModel.findOneAndDelete({
-            tgId: Number(chatId),
+            tgId: Number(chatId)
           })
           if (deleteResponse?._id) {
             await ProductModel.deleteMany({ trackedBy: deleteResponse._id })
@@ -68,8 +68,8 @@ export const broadcastWorker = new Worker(
     concurrency: 5,
     limiter: {
       max: 30,
-      duration: 2000,
-    },
+      duration: 2000
+    }
   }
 )
 
@@ -85,11 +85,11 @@ export const sendMessageQueue = async (payload: {
     {
       chatId: payload.chatId,
       text: payload.text,
-      extra: payload.extra,
+      extra: payload.extra
     },
     {
       // FIX: Prefix with string and add timestamp to allow multiple messages
-      jobId: `msg-${payload.chatId}-${Date.now()}`, 
+      jobId: `msg-${payload.chatId}-${Date.now()}`
     }
   )
 

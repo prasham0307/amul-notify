@@ -20,7 +20,7 @@ export const broadcastQueue = new Queue('broadcast', {
 // 2. Define the QueueEvents (To listen for "finished" events)
 const queueEvents = new QueueEvents('broadcast', {
   // 👇 FIX 1: Added "as any" here
-  connection: createRedisConnection() as any 
+  connection: createRedisConnection() as any
 })
 
 // 3. Define the Worker (Consumers process jobs here)
@@ -66,7 +66,7 @@ export const broadcastWorker = new Worker(
   },
   {
     // 👇 FIX 2: Added "as any" here
-    connection: createRedisConnection() as any, 
+    connection: createRedisConnection() as any,
     concurrency: 5,
     limiter: {
       max: 30,

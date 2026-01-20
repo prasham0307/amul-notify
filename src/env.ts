@@ -29,8 +29,9 @@ const envSchema = z.object({
   TRACKER_ENABLED: z
     .enum(['true', 'false'])
     .default('true')
-    .transform((val) => val === 'true')
-})
+    .transform((val) => val === 'true'),
+  LOG_CHANNEL_ID: z.string().optional()
+});
 
 export type Env = z.infer<typeof envSchema>
 

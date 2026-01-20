@@ -1,5 +1,4 @@
 import { BotCommand } from 'telegraf/typings/core/types/typegram'
-import env from './env' // Import your env file so we can read the variable
 
 // FIX: Use the ID from .env, or fallback to YOUR personal ID (not the old group)
 // Fallback to process.env directly if the 'env' import is being stubborn

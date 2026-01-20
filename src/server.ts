@@ -69,7 +69,6 @@ const waitForRedis = async () => {
           console.warn(
             '⚠️ Redis connection timeout (5s) - continuing without Redis'
           )
-          console.warn('⚠️ App will use in-memory cache or direct API calls')
         }
         resolve()
       }
@@ -91,8 +90,6 @@ const performDatabaseMaintenance = async () => {
       } catch (err: any) {
         if (err.code === 27 || err.codeName === 'IndexNotFound') {
           console.log('ℹ️ userId index does not exist (already cleaned)')
-        } else {
-          console.log('⚠️ Index cleanup warning:', err.message)
         }
       }
 
@@ -111,17 +108,29 @@ const performDatabaseMaintenance = async () => {
     console.log('✅ Database maintenance completed')
   } catch (err) {
     console.error('❌ Database maintenance error:', err)
-    // Don't throw - maintenance errors shouldn't prevent startup
   }
 }
 
 const startServer = async () => {
   try {
+    // --- STEP 1: START HTTP SERVER IMMEDIATELY ---
+    // This fixes the "No open ports" error on Render by opening the door instantly.
+
+    app.get('/', (req: any, res: any) => {
+      res.status(200).send('Amul Notify Bot is Alive!')
+    })
+
+    const PORT = Number(process.env.PORT) || 10000
+    // Bind to 0.0.0.0 to ensure external access
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`✅ Server is running immediately on port ${PORT}`)
+    })
+
+    // --- STEP 2: INITIALIZE BACKEND IN BACKGROUND ---
+    console.log('⏳ Initializing backend services (DB, Redis, Amul)...')
+
     // Wait for Redis (with timeout)
     await waitForRedis()
-
-    // Log Redis status
-    console.log(`📊 Redis status: ${redis.status}`)
 
     // Connect to MongoDB
     await mongoose.connect(env.MONGO_URI)
@@ -166,18 +175,6 @@ const startServer = async () => {
       console.log('✅ Bot is running in polling mode...')
     }
 
-    // --- HEALTH CHECK ROUTE ---
-    app.get('/', (req: any, res: any) => {
-      res.status(200).send('Amul Notify Bot is Alive!')
-    })
-
-    // --- START SERVER (FIXED BINDING) ---
-    const PORT = Number(process.env.PORT) || 10000
-    // Bind to 0.0.0.0 to ensure external access
-    app.listen(PORT, '0.0.0.0', () => {
-      console.log(`✅ Server is running on port ${PORT}`)
-    })
-
     // Start jobs
     if (env.TRACKER_ENABLED) {
       console.log('Starting stock checker job...')
@@ -193,7 +190,7 @@ const startServer = async () => {
     }
   } catch (err) {
     console.error('❌ Failed to start server:', err)
-    process.exit(1)
+    // We do NOT exit process here, so the web server stays alive to show logs
   }
 }
 

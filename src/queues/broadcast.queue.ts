@@ -9,7 +9,7 @@ import { connection, createRedisConnection } from '@/redis'
 
 // 1. Define the Queue (Producers add jobs here)
 export const broadcastQueue = new Queue('broadcast', {
-  connection,
+  connection: connection as any, // ✅ You had this one correct
   defaultJobOptions: {
     attempts: 1,
     removeOnComplete: true,
@@ -19,7 +19,8 @@ export const broadcastQueue = new Queue('broadcast', {
 
 // 2. Define the QueueEvents (To listen for "finished" events)
 const queueEvents = new QueueEvents('broadcast', {
-  connection: createRedisConnection()
+  // 👇 FIX 1: Added "as any" here
+  connection: createRedisConnection() as any 
 })
 
 // 3. Define the Worker (Consumers process jobs here)
@@ -64,7 +65,8 @@ export const broadcastWorker = new Worker(
     }
   },
   {
-    connection: createRedisConnection(), // CRITICAL: Use the factory
+    // 👇 FIX 2: Added "as any" here
+    connection: createRedisConnection() as any, 
     concurrency: 5,
     limiter: {
       max: 30,
@@ -88,7 +90,6 @@ export const sendMessageQueue = async (payload: {
       extra: payload.extra
     },
     {
-      // FIX: Prefix with string and add timestamp to allow multiple messages
       jobId: `msg-${payload.chatId}-${Date.now()}`
     }
   )

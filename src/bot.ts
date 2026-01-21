@@ -26,7 +26,6 @@ import { toggleTrackingStyleAction } from './actions/toggleTrackingStyle.action'
 import { changeMaxNotifyCount } from './actions/changeMaxNotifyCount.action'
 import { changeMaxNotifyCountWizard } from './wizards/changeMaxNotifyCount.wizard'
 import { favouritesCommand } from './commands/favourites.command'
-import { mapCommand } from './commands/map.command'
 import { analyticsMiddleware } from './middlewares/analytics.middleware'
 
 const bot = new Telegraf<MyContext>(env.BOT_TOKEN)
@@ -53,7 +52,6 @@ bot.command('support', withCatchAsync(supportCommand))
 bot.command('pincode', withCatchAsync(pincodeCommand))
 bot.command('settings', settingsCommand)
 bot.command('favourites', withCatchAsync(favouritesCommand))
-bot.command('map', withCatchAsync(mapCommand))
 
 bot.command(
   'broadcast',

@@ -14,7 +14,7 @@ import { logToChannel } from '@/utils/logger.util'
 import { substoreList } from '@/utils/substores'
 import axios from 'axios'
 import { wrapper } from 'axios-cookiejar-support'
-import { CookieJar, parse as parseCookie } from 'tough-cookie'
+import { CookieJar } from 'tough-cookie'
 
 // interface AmulSessionKey {
 //   pincode: string
@@ -70,7 +70,7 @@ export class AmulApi {
 
   public async initCookies() {
     console.log('Launching stealth browser to bypass Cloudflare...')
-    
+
     const browser = await puppeteer.launch({
       headless: true,
       args: [
@@ -86,13 +86,13 @@ export class AmulApi {
       await page.setUserAgent(defaultHeaders['user-agent'])
 
       console.log('Navigating to Amul to solve challenge...')
-      await page.goto('https://shop.amul.com/en/browse/protein', { 
+      await page.goto('https://shop.amul.com/en/browse/protein', {
         waitUntil: 'networkidle2',
-        timeout: 30000 
+        timeout: 30000
       })
 
       // Wait 5 seconds to ensure Cloudflare's "Just a moment" check finishes
-      await new Promise(r => setTimeout(r, 5000))
+      await new Promise((r) => setTimeout(r, 5000))
 
       const cookies = await page.cookies()
       if (!cookies.length) {
@@ -104,16 +104,18 @@ export class AmulApi {
         try {
           await this.jar.setCookie(cookieStr, 'https://shop.amul.com')
         } catch (err: any) {
-          if (err.message && err.message.includes("Cookie not in this host's domain")) {
+          if (
+            err.message &&
+            err.message.includes("Cookie not in this host's domain")
+          ) {
             // Ignore cross-domain cookies
           } else {
             throw err
           }
         }
       }
-      
-      console.log('Successfully bypassed Cloudflare and extracted cookies.')
 
+      console.log('Successfully bypassed Cloudflare and extracted cookies.')
     } finally {
       await browser.close()
     }

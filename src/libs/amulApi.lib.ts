@@ -1,3 +1,7 @@
+import puppeteer from 'puppeteer-extra'
+import StealthPlugin from 'puppeteer-extra-plugin-stealth'
+
+puppeteer.use(StealthPlugin())
 import cacheService from '@/services/cache.service'
 import {
   AmulPincodeResponse,
@@ -65,40 +69,53 @@ export class AmulApi {
   }
 
   public async initCookies() {
-    const cookieResponse = await this.amulApi.get(
-      'https://shop.amul.com/en/browse/protein'
-    )
+    console.log('Launching stealth browser to bypass Cloudflare...')
+    
+    const browser = await puppeteer.launch({
+      headless: true,
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-gpu'
+      ]
+    })
 
-    if (!cookieResponse.headers['set-cookie']) {
-      throw new Error('No cookies received from Amul API')
-    }
+    try {
+      const page = await browser.newPage()
+      await page.setUserAgent(defaultHeaders['user-agent'])
 
-    const parsedCookies = cookieResponse.headers['set-cookie'].map(
-      (cookieStr) => parseCookie(cookieStr, { loose: true })
-    )
+      console.log('Navigating to Amul to solve challenge...')
+      await page.goto('https://shop.amul.com/en/browse/protein', { 
+        waitUntil: 'networkidle2',
+        timeout: 30000 
+      })
 
-    for (const cookie of parsedCookies) {
-      if (!cookie || !cookie.key) {
-        console.warn('Invalid cookie:', cookie)
-        continue
+      // Wait 5 seconds to ensure Cloudflare's "Just a moment" check finishes
+      await new Promise(r => setTimeout(r, 5000))
+
+      const cookies = await page.cookies()
+      if (!cookies.length) {
+        throw new Error('No cookies received from Puppeteer')
       }
 
-      try {
-        // attempt to set the cookie
-        await this.jar.setCookie(cookie, 'https://shop.amul.com')
-      } catch (err: any) {
-        // Check if it's the specific domain mismatch error
-        if (
-          err.message &&
-          err.message.includes("Cookie not in this host's domain")
-        ) {
-          // Simply ignore it. It's a cross-domain tracking cookie we don't need.
-          // console.warn(`⚠️ Ignored cross-domain cookie: ${cookie.key}`);
-        } else {
-          // If it's some other error, re-throw it so we know something is wrong
-          throw err
+      for (const cookie of cookies) {
+        const cookieStr = `${cookie.name}=${cookie.value}; Domain=${cookie.domain}; Path=${cookie.path}`
+        try {
+          await this.jar.setCookie(cookieStr, 'https://shop.amul.com')
+        } catch (err: any) {
+          if (err.message && err.message.includes("Cookie not in this host's domain")) {
+            // Ignore cross-domain cookies
+          } else {
+            throw err
+          }
         }
       }
+      
+      console.log('Successfully bypassed Cloudflare and extracted cookies.')
+
+    } finally {
+      await browser.close()
     }
 
     const infoResponse = await this.amulApi.get<string>(

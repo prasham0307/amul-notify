@@ -30,38 +30,40 @@ export const setPincodeCommand: MiddlewareFn<CommandContext> = async (
     }
   )
 
-  const amulApi = await getOrCreateAmulApi(pincode).catch((err) => {
-    console.error('Error creating Amul API instance:', err)
-    return ctx.reply(
-      `${emojis.exclamation} Failed to set pincode. Please try again later or contact /support.\n` +
-        `Error: ${err.message}` // Provide error details for debugging
-    )
-  })
+  getOrCreateAmulApi(pincode)
+    .then(async (amulApi) => {
+      await ctx.deleteMessage(msg.message_id).catch((err) => {
+        console.error('Error deleting message:', err)
+      })
 
-  await ctx.deleteMessage(msg.message_id).catch((err) => {
-    console.error('Error deleting message:', err)
-  })
+      if (amulApi instanceof AmulApi) {
+        console.log(
+          `Setting pincode for user ${
+            ctx.user.tgId
+          } to ${pincode} with substore: ${amulApi.getSubstore()}`
+        )
+        ctx.user.set('pincode', pincode)
+        ctx.user.set('substore', amulApi.getSubstore())
+        await ctx.user.save()
+        return ctx.reply(
+          `${emojis.checkMark} Pincode set successfully to ${ctx.user.pincode}.\n` +
+            `Substore: ${ctx.user.substore}\n` +
+            `You can now use the bot to track products in your area.`
+        )
+      } else {
+        return ctx.reply(
+          `${emojis.warning} Failed to set pincode. Please try again later or contact /support.`
+        )
+      }
+    })
+    .catch(async (err) => {
+      console.error('Error creating Amul API instance:', err)
+      await ctx.deleteMessage(msg.message_id).catch(() => {})
+      return ctx.reply(
+        `${emojis.exclamation} Failed to set pincode. Please try again later or contact /support.\n` +
+          `Error: ${err.message}` // Provide error details for debugging
+      )
+    })
 
-  // console.log('Amul API instance:', amulApi)
-
-  if (amulApi instanceof AmulApi) {
-    console.log(
-      `Setting pincode for user ${
-        ctx.user.tgId
-      } to ${pincode} with substore: ${amulApi.getSubstore()}`
-    )
-    ctx.user.set('pincode', pincode)
-    ctx.user.set('substore', amulApi.getSubstore())
-    await ctx.user.save()
-    return ctx.reply(
-      `${emojis.checkMark} Pincode set successfully to ${ctx.user.pincode}.\n` +
-        `Substore: ${ctx.user.substore}\n` +
-        `You can now use the bot to track products in your area.`
-    )
-  }
-
-  ctx.reply(
-    `${emojis.warning} Failed to set pincode. Please try again later or contact /support.`
-  )
   return next()
 }

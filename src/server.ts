@@ -140,7 +140,9 @@ const startServer = async () => {
     await performDatabaseMaintenance()
 
     // Initialize Amul sessions in the background so it doesn't block bot startup
-    initiateAmulSessions().catch(err => console.error('Failed to initiate Amul sessions:', err))
+    initiateAmulSessions().catch((err) =>
+      console.error('Failed to initiate Amul sessions:', err)
+    )
 
     // Setup bot
     if (env.BOT_WEBHOOK_URL) {

@@ -43,6 +43,30 @@ export const defaultHeaders = {
     'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36'
 }
 
+class Mutex {
+  private queue: ((release: () => void) => void)[] = []
+  private locked = false
+
+  async acquire(): Promise<() => void> {
+    return new Promise((resolve) => {
+      this.queue.push(resolve)
+      this.dispatch()
+    })
+  }
+
+  private dispatch() {
+    if (this.locked || this.queue.length === 0) return
+    this.locked = true
+    const resolve = this.queue.shift()!
+    resolve(() => {
+      this.locked = false
+      this.dispatch()
+    })
+  }
+}
+
+const puppeteerMutex = new Mutex()
+
 export class AmulApi {
   private pincodeRecord!: PincodeRecord
   public amulApi: ReturnType<typeof wrapper>
@@ -69,7 +93,11 @@ export class AmulApi {
   }
 
   public async initCookies() {
-    console.log('Launching stealth browser to bypass Cloudflare...')
+    console.log('Waiting for Puppeteer lock...')
+    const release = await puppeteerMutex.acquire()
+    console.log(
+      'Acquired Puppeteer lock. Launching stealth browser to bypass Cloudflare...'
+    )
 
     const browser = await puppeteer.launch({
       headless: true,
@@ -118,6 +146,7 @@ export class AmulApi {
       console.log('Successfully bypassed Cloudflare and extracted cookies.')
     } finally {
       await browser.close()
+      release()
     }
 
     const infoResponse = await this.amulApi.get<string>(

@@ -8,5 +8,12 @@ export const pincodeGuard: MiddlewareFn<MyContext> = async (ctx, next) => {
       `${emojis.exclamation} Please set your pincode first using /setpincode command to use this feature.`
     )
   }
+
+  if (!ctx.amul || typeof ctx.amul.getProteinProducts !== 'function') {
+    return ctx.reply(
+      `⏳ The system is currently starting up and bypassing Cloudflare for your pincode (${ctx.user.pincode}).\n\nPlease wait a few seconds and try again.`
+    )
+  }
+
   return next()
 }

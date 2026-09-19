@@ -3,7 +3,8 @@ import UserModel, { HydratedUser } from '@/models/user.model'
 import { MyContext } from '@/types/context.types'
 import { emojis } from '@/utils/emoji.util'
 import ProductModel, { HydratedProduct } from '@/models/product.model'
-import { AmulApi, getOrCreateAmulApi } from '@/libs/amulApi.lib'
+import { AmulApi } from '@/libs/amulApi.lib'
+import { getAmulApiFromSubstore } from '@/services/amul.service'
 
 export const sessionMiddleware: MiddlewareFn<MyContext> = async (ctx, next) => {
   if (!ctx.from) {
@@ -39,6 +40,10 @@ export const sessionMiddleware: MiddlewareFn<MyContext> = async (ctx, next) => {
     return ctx.reply('🚫 You are blocked from using this service.')
   }
 
+  const amulApi = user.substore
+    ? await getAmulApiFromSubstore(user.substore)
+    : undefined
+
   // ctx.user = user
   Object.assign<
     typeof ctx,
@@ -50,10 +55,7 @@ export const sessionMiddleware: MiddlewareFn<MyContext> = async (ctx, next) => {
     }).sort({
       createdAt: -1
     }),
-    amul:
-      (await getOrCreateAmulApi(user.pincode).catch((err) =>
-        console.log(err)
-      )) ?? ({} as AmulApi) // Note: pincode should be set before this middleware is called (exception for /setpincode)
+    amul: (amulApi as AmulApi) ?? ({} as AmulApi)
   })
 
   return next()

@@ -156,8 +156,7 @@ export class AmulApi {
           ...defaultHeaders,
           cookie: await this.jar.getCookieString('https://shop.amul.com'),
           tid: await this.calculateTidHeader()
-        },
-        timeout: 15000
+        }
       }
     )
 
@@ -192,8 +191,7 @@ export class AmulApi {
           ...defaultHeaders,
           tid: tid,
           cookie: cookieStr // Use the cookie string from the job data
-        },
-        timeout: 15000
+        }
       }
     )
     console.log('Set Pincode Response:', response.data)
@@ -219,8 +217,7 @@ export class AmulApi {
           ...defaultHeaders,
           tid: await this.calculateTidHeader(),
           cookie: await this.jar.getCookieString('https://shop.amul.com')
-        },
-        timeout: 15000
+        }
       }
     )
 
@@ -289,8 +286,7 @@ export class AmulApi {
           ...defaultHeaders,
           cookie: await this.jar.getCookieString('https://shop.amul.com'),
           tid: await this.calculateTidHeader()
-        },
-        timeout: 15000
+        }
       }
     )
 

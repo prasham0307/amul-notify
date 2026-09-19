@@ -116,7 +116,7 @@ export class AmulApi {
       console.log('Navigating to Amul to solve challenge...')
       await page.goto('https://shop.amul.com/en/browse/protein', {
         waitUntil: 'networkidle2',
-        timeout: 30000
+        timeout: 60000
       })
 
       // Wait 5 seconds to ensure Cloudflare's "Just a moment" check finishes
